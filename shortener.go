@@ -11,7 +11,6 @@ import (
 	"github.com/codegangsta/martini"
 	"github.com/codegangsta/martini-contrib/binding"
 	"github.com/codegangsta/martini-contrib/render"
-	"github.com/cupcake/raven-go"
 	"github.com/speps/go-hashids"
 )
 
@@ -19,7 +18,7 @@ type Config struct {
 	Backend   Backend
 	HashSalt  string
 	URLPrefix string
-	Raven     *raven.Client
+	ReportErr func(err error, req *http.Request)
 }
 
 func New(c *Config) *martini.Martini {
@@ -32,7 +31,7 @@ func New(c *Config) *martini.Martini {
 		ShortHash: hashids.New(),
 		LongHash:  hashids.New(),
 		URLPrefix: c.URLPrefix,
-		Raven:     c.Raven,
+		ReportErr: c.ReportErr,
 	}
 	if c.HashSalt == "" {
 		c.HashSalt = "salt"
@@ -71,7 +70,7 @@ type context struct {
 	ShortHash *hashids.HashID
 	LongHash  *hashids.HashID
 	URLPrefix string
-	Raven     *raven.Client
+	ReportErr func(err error, req *http.Request)
 }
 
 func urlDigest(url string) string {
@@ -99,8 +98,8 @@ func createLink(c *context, link link, r render.Render, req *http.Request) {
 	id, err := c.NextID()
 	if err != nil {
 		r.Error(500)
-		if c.Raven != nil {
-			c.Raven.CaptureError(err, nil, raven.NewHttp(req))
+		if c.ReportErr != nil {
+			c.ReportErr(err, req)
 		}
 	}
 	if link.Obscure != nil && *link.Obscure {
@@ -111,8 +110,8 @@ func createLink(c *context, link link, r render.Render, req *http.Request) {
 
 	if err := c.Add(link.LongURL, digest, code); err != nil {
 		r.Error(500)
-		if c.Raven != nil {
-			c.Raven.CaptureError(err, nil, raven.NewHttp(req))
+		if c.ReportErr != nil {
+			c.ReportErr(err, req)
 		}
 	}
 	link.Obscure = nil
@@ -128,8 +127,8 @@ func getLink(c *context, params martini.Params, r render.Render, req *http.Reque
 	}
 	if err != nil {
 		r.Error(500)
-		if c.Raven != nil {
-			c.Raven.CaptureError(err, nil, raven.NewHttp(req))
+		if c.ReportErr != nil {
+			c.ReportErr(err, req)
 		}
 		return
 	}
