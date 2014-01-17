@@ -101,6 +101,7 @@ func createLink(c *context, link link, r render.Render, req *http.Request) {
 		if c.ReportErr != nil {
 			c.ReportErr(err, req)
 		}
+		return
 	}
 	if link.Obscure != nil && *link.Obscure {
 		code = c.LongHash.Encrypt([]int{id})
@@ -113,6 +114,7 @@ func createLink(c *context, link link, r render.Render, req *http.Request) {
 		if c.ReportErr != nil {
 			c.ReportErr(err, req)
 		}
+		return
 	}
 	link.Obscure = nil
 	link.ShortURL = c.URLPrefix + code
