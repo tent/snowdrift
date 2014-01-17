@@ -5,7 +5,7 @@ import (
 )
 
 type IDBackend interface {
-	NextID() (int, error)
+	NextID(obscure bool) (int, error)
 }
 
 type RiakBackend struct {

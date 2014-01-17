@@ -57,6 +57,10 @@ func (b *RedisBackend) GetURL(code string) (string, error) {
 	return res, err
 }
 
-func (b *RedisBackend) NextID() (int, error) {
-	return redis.Int(b.conn.Do("INCR", b.prefix+"id"))
+func (b *RedisBackend) NextID(obscure bool) (int, error) {
+	key := "id"
+	if obscure {
+		key += "-obscure"
+	}
+	return redis.Int(b.conn.Do("INCR", b.prefix+key))
 }

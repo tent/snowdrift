@@ -6,10 +6,11 @@ import (
 )
 
 type MemoryBackend struct {
-	urlCodes map[string]string
-	codeURLs map[string]string
-	id       uint64
-	mtx      sync.RWMutex
+	urlCodes  map[string]string
+	codeURLs  map[string]string
+	id        uint64
+	obscureID uint64
+	mtx       sync.RWMutex
 }
 
 func NewMemoryBackend() Backend {
@@ -53,6 +54,12 @@ func (b *MemoryBackend) GetURL(code string) (string, error) {
 	return url, nil
 }
 
-func (b *MemoryBackend) NextID() (int, error) {
-	return int(atomic.AddUint64(&b.id, 1)), nil
+func (b *MemoryBackend) NextID(obscure bool) (int, error) {
+	var id *uint64
+	if obscure {
+		id = &b.obscureID
+	} else {
+		id = &b.id
+	}
+	return int(atomic.AddUint64(id, 1)), nil
 }

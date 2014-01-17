@@ -79,7 +79,7 @@ type Backend interface {
 	Add(url, digest, code string) error
 	GetCode(digest string) (string, error)
 	GetURL(code string) (string, error)
-	NextID() (int, error)
+	NextID(obscure bool) (int, error)
 }
 
 type link struct {
@@ -138,8 +138,12 @@ func createLink(c *context, link link, r render.Render, w http.ResponseWriter, r
 		r.JSON(200, link)
 		return
 	}
+	var obscure bool
+	if link.Obscure != nil {
+		obscure = *link.Obscure
+	}
 
-	id, err := c.NextID()
+	id, err := c.NextID(obscure)
 	if err != nil {
 		r.Error(500)
 		if c.ReportErr != nil {
@@ -147,7 +151,7 @@ func createLink(c *context, link link, r render.Render, w http.ResponseWriter, r
 		}
 		return
 	}
-	if link.Obscure != nil && *link.Obscure {
+	if obscure {
 		code = c.LongHash.Encrypt([]int{id})
 	} else {
 		code = c.ShortHash.Encrypt([]int{id})
