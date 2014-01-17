@@ -128,7 +128,7 @@ func createLink(c *context, link link, r render.Render, req *http.Request) {
 func getLink(c *context, params martini.Params, r render.Render, req *http.Request, w http.ResponseWriter) {
 	url, err := c.GetURL(params["code"])
 	if err == ErrNotFound {
-		r.Error(404)
+		http.NotFound(w, req)
 		return
 	}
 	if err != nil {
@@ -144,6 +144,5 @@ func getLink(c *context, params martini.Params, r render.Render, req *http.Reque
 		return
 	}
 
-	w.Header().Set("Location", url)
-	w.WriteHeader(http.StatusMovedPermanently)
+	http.Redirect(w, req, url, http.StatusMovedPermanently)
 }
