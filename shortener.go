@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"regexp"
 
 	"bitbucket.org/ww/goautoneg"
 	"github.com/codegangsta/martini"
@@ -15,11 +16,12 @@ import (
 )
 
 type Config struct {
-	Backend      Backend
-	HashSalt     string
-	URLPrefix    string
-	RootRedirect string
-	ReportErr    func(err error, req *http.Request)
+	Backend        Backend
+	HashSalt       string
+	URLPrefix      string
+	RootRedirect   string
+	AllowedOrigins *regexp.Regexp
+	ReportErr      func(err error, req *http.Request)
 }
 
 func New(c *Config) *martini.Martini {
@@ -28,11 +30,12 @@ func New(c *Config) *martini.Martini {
 	m.Action(r.Handle)
 
 	ctx := &context{
-		Backend:   c.Backend,
-		ShortHash: hashids.New(),
-		LongHash:  hashids.New(),
-		URLPrefix: c.URLPrefix,
-		ReportErr: c.ReportErr,
+		Backend:        c.Backend,
+		ShortHash:      hashids.New(),
+		LongHash:       hashids.New(),
+		URLPrefix:      c.URLPrefix,
+		AllowedOrigins: c.AllowedOrigins,
+		ReportErr:      c.ReportErr,
 	}
 	if c.HashSalt == "" {
 		c.HashSalt = "salt"
@@ -43,8 +46,23 @@ func New(c *Config) *martini.Martini {
 	m.Map(ctx)
 	m.Use(render.Renderer())
 
-	r.Get("/", func(r *http.Request, w http.ResponseWriter) {
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, c.RootRedirect, http.StatusFound)
+	})
+	r.Options("/", func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			w.WriteHeader(200)
+			return
+		}
+		if c.AllowedOrigins != nil && !c.AllowedOrigins.MatchString(origin) {
+			w.WriteHeader(400)
+			return
+		}
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+		w.Header().Set("Access-Control-Max-Age", "3600")
+		w.WriteHeader(200)
 	})
 	r.Post("/", binding.Bind(link{}), createLink)
 	r.Get("/:code", getLink)
@@ -71,10 +89,20 @@ type link struct {
 
 type context struct {
 	Backend
-	ShortHash *hashids.HashID
-	LongHash  *hashids.HashID
-	URLPrefix string
-	ReportErr func(err error, req *http.Request)
+	ShortHash      *hashids.HashID
+	LongHash       *hashids.HashID
+	URLPrefix      string
+	AllowedOrigins *regexp.Regexp
+	ReportErr      func(err error, req *http.Request)
+}
+
+func (c *context) validCORS(w http.ResponseWriter, req *http.Request) bool {
+	if origin := req.Header.Get("Origin"); origin != "" && (c.AllowedOrigins == nil || c.AllowedOrigins.MatchString(origin)) {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		return true
+	}
+	w.WriteHeader(400)
+	return false
 }
 
 func urlDigest(url string) string {
@@ -82,7 +110,10 @@ func urlDigest(url string) string {
 	return hex.EncodeToString(digest[:32])
 }
 
-func createLink(c *context, link link, r render.Render, req *http.Request) {
+func createLink(c *context, link link, r render.Render, w http.ResponseWriter, req *http.Request) {
+	if !c.validCORS(w, req) {
+		return
+	}
 	if len(link.LongURL) > 2000 {
 		r.Error(400)
 		return
@@ -130,6 +161,10 @@ func createLink(c *context, link link, r render.Render, req *http.Request) {
 }
 
 func getLink(c *context, params martini.Params, r render.Render, req *http.Request, w http.ResponseWriter) {
+	if !c.validCORS(w, req) {
+		return
+	}
+
 	url, err := c.GetURL(params["code"])
 	if err == ErrNotFound {
 		http.NotFound(w, req)
