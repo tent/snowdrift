@@ -15,10 +15,11 @@ import (
 )
 
 type Config struct {
-	Backend   Backend
-	HashSalt  string
-	URLPrefix string
-	ReportErr func(err error, req *http.Request)
+	Backend      Backend
+	HashSalt     string
+	URLPrefix    string
+	RootRedirect string
+	ReportErr    func(err error, req *http.Request)
 }
 
 func New(c *Config) *martini.Martini {
@@ -42,6 +43,9 @@ func New(c *Config) *martini.Martini {
 	m.Map(ctx)
 	m.Use(render.Renderer())
 
+	r.Get("/", func(r *http.Request, w http.ResponseWriter) {
+		http.Redirect(w, r, c.RootRedirect, http.StatusFound)
+	})
 	r.Post("/", binding.Bind(link{}), createLink)
 	r.Get("/:code", getLink)
 
