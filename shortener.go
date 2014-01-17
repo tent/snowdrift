@@ -110,8 +110,12 @@ func (c *context) validCORS(w http.ResponseWriter, req *http.Request) bool {
 	return false
 }
 
-func urlDigest(url string) string {
-	digest := sha512.Sum512([]byte(url))
+func urlDigest(url string, obscure bool) string {
+	prefix := "+"
+	if obscure {
+		prefix = "-"
+	}
+	digest := sha512.Sum512([]byte(prefix + url))
 	return hex.EncodeToString(digest[:32])
 }
 
@@ -129,18 +133,18 @@ func createLink(c *context, link link, r render.Render, w http.ResponseWriter, r
 		return
 	}
 
-	digest := urlDigest(link.LongURL)
+	var obscure bool
+	if link.Obscure != nil {
+		obscure = *link.Obscure
+	}
 
+	digest := urlDigest(link.LongURL, obscure)
 	code, err := c.GetCode(digest)
 	if err == nil {
 		link.ShortURL = c.URLPrefix + code
 		link.Obscure = nil
 		r.JSON(200, link)
 		return
-	}
-	var obscure bool
-	if link.Obscure != nil {
-		obscure = *link.Obscure
 	}
 
 	id, err := c.NextID(obscure)
