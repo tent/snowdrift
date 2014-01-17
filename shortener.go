@@ -97,7 +97,11 @@ type context struct {
 }
 
 func (c *context) validCORS(w http.ResponseWriter, req *http.Request) bool {
-	if origin := req.Header.Get("Origin"); origin != "" && (c.AllowedOrigins == nil || c.AllowedOrigins.MatchString(origin)) {
+	origin := req.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	if c.AllowedOrigins == nil || c.AllowedOrigins.MatchString(origin) {
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		return true
 	}
