@@ -83,6 +83,10 @@ func urlDigest(url string) string {
 }
 
 func createLink(c *context, link link, r render.Render, req *http.Request) {
+	if len(link.LongURL) > 2000 {
+		r.Error(400)
+		return
+	}
 	u, err := url.Parse(link.LongURL)
 	if err != nil || u.Scheme != "http" && u.Scheme != "https" {
 		r.Error(400)
